@@ -1,2 +1,2 @@
 # logger
-Logger
+Logger library for microservices
