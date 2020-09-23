@@ -18,9 +18,9 @@ type ICaller interface {
 
 //e.g.:
 type Caller struct {
-	file       string //e.g. /data/jans/workspace/github.com/jansemmelink/ms/caller_test.go
+	file       string
 	line       int
-	pkgDotFunc string //e.g. github.com/jansemmelink/ms_test.TestCaller
+	pkgDotFunc string
 }
 
 func GetCaller(skip int) Caller {
@@ -46,8 +46,8 @@ func (c Caller) String() string {
 	return fmt.Sprintf("%s(%d)", path.Base(c.file), c.line)
 }
 
-//with Function: "github.com/jansemmelink/ms_test.TestCaller"
-//return "github.com/jansemmelink/ms_test"
+//with Function: "github.com/go-msvc/ms_test.TestCaller"
+//return "github.com/go-msvc/ms_test"
 func (c Caller) Package() string {
 	if i := strings.LastIndex(c.pkgDotFunc, "."); i >= 0 {
 		return c.pkgDotFunc[:i]
@@ -55,8 +55,8 @@ func (c Caller) Package() string {
 	return ""
 }
 
-//with Function: "github.com/jansemmelink/ms_test.TestCaller"
-//return "github.com/jansemmelink/ms_test"
+//with Function: "github.com/go-msvc/ms_test.TestCaller"
+//return "github.com/go-msvc/ms_test"
 func (c Caller) Function() string {
 	if i := strings.LastIndex(c.pkgDotFunc, "."); i >= 0 {
 		return c.pkgDotFunc[i+1:]
