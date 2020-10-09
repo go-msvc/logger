@@ -78,12 +78,11 @@ func (l *logger) WithStream(s ILogStream) ILogger {
 	return l
 }
 
-func (l *logger) Log(level LogLevel, msg string) {
-	//determine caller
-
+func (l *logger) log(caller Caller, level LogLevel, msg string) {
 	//send to all streams
 	for _, s := range l.streams {
 		s.Log(LogRecord{
+			Caller:    caller,
 			Timestamp: time.Now(),
 			Logger:    l,
 			Level:     level,
@@ -92,22 +91,28 @@ func (l *logger) Log(level LogLevel, msg string) {
 	}
 }
 
+func (l *logger) Log(level LogLevel, msg string) {
+	l.log(GetCaller(1), level, msg)
+}
+
 func (l logger) Logf(level LogLevel, format string, args ...interface{}) {
-	//format the message
 	msg := fmt.Sprintf(format, args...)
-	l.Log(level, msg)
+	l.log(GetCaller(2), level, msg)
 }
 
 func (l logger) Debugf(format string, args ...interface{}) {
-	l.Logf(LogLevelDebug, format, args...)
+	msg := fmt.Sprintf(format, args...)
+	l.log(GetCaller(2), LogLevelDebug, msg)
 }
 
 func (l logger) Infof(format string, args ...interface{}) {
-	l.Logf(LogLevelInfo, format, args...)
+	msg := fmt.Sprintf(format, args...)
+	l.log(GetCaller(2), LogLevelInfo, msg)
 }
 
 func (l logger) Errorf(format string, args ...interface{}) {
-	l.Logf(LogLevelError, format, args...)
+	msg := fmt.Sprintf(format, args...)
+	l.log(GetCaller(2), LogLevelError, msg)
 }
 
 type ILogStream interface {
