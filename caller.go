@@ -105,11 +105,15 @@ func (caller Caller) Format(f fmt.State, c rune) {
 		if w < 0 {
 			s = ""
 		} else if w <= len(s) {
+			//right/left truncate
 			if f.Flag('-') {
 				s = s[:w]
 			} else {
 				s = s[len(s)-w:]
 			}
+		} else if w > len(s) {
+			//pad to fill the space
+			s = fmt.Sprintf("%*s", w, s)
 		}
 	}
 	io.WriteString(f, s)

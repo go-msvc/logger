@@ -28,7 +28,7 @@ func (w *logWriter) Write(r []byte) {
 func TestLogger(t *testing.T) {
 	w := &logWriter{t: t}
 	e := logEncoder{t: t}
-	l := logger.NewLogger("test").
+	l := logger.Top().New("test").
 		WithStream(logger.NewLogStream().WithWriter(w).WithEncoder(e))
 
 	w.logs = ""
