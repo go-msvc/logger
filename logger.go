@@ -18,7 +18,7 @@ const (
 )
 
 type ILogger interface {
-	New(name string) ILogger //name is valid pathname
+	NewLogger(name string) ILogger //name must be valid pathname
 	Parent() ILogger
 	Children() map[string]ILogger
 
@@ -36,7 +36,7 @@ func Top() ILogger {
 
 func ForThisPackage() ILogger {
 	c := GetCaller(1)
-	return top.New(c.Package())
+	return top.NewLogger(c.Package())
 }
 
 //Terminal is a stream for logging to stderr
@@ -72,7 +72,7 @@ type logger struct {
 	streams  []ILogStream
 }
 
-func (l *logger) New(name string) ILogger {
+func (l *logger) NewLogger(name string) ILogger {
 	l.Lock()
 	defer l.Unlock()
 
@@ -104,7 +104,7 @@ func (l *logger) New(name string) ILogger {
 	}
 
 	if len(names) > 1 {
-		return child.New(names[1])
+		return child.NewLogger(names[1])
 	}
 	return child
 }
