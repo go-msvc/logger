@@ -171,10 +171,10 @@ func (l *logger) Errorf(format string, args ...interface{}) {
 	l.log(GetCaller(2), LogLevelError, msg)
 }
 
-func (l *logger) debugOn() {
-	//let all streams write to debug
+// func (l *logger) debugOn() {
+// 	//let all streams write to debug
 
-}
+// }
 
 type ILogStream interface {
 	WithWriter(ILogWriter) ILogStream
