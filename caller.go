@@ -8,23 +8,23 @@ import (
 	"strings"
 )
 
-type ICaller interface {
+type Caller interface {
 	fmt.Stringer
 	Package() string
+	PackageFile() string
 	Function() string
 	File() string
 	Line() int
 }
 
-//e.g.:
-type Caller struct {
+type caller struct {
 	file       string
 	line       int
 	pkgDotFunc string
 }
 
 func GetCaller(skip int) Caller {
-	c := Caller{
+	c := caller{
 		file:       "",
 		line:       -1,
 		pkgDotFunc: "",
@@ -42,37 +42,46 @@ func GetCaller(skip int) Caller {
 	return c
 } //GetCaller()
 
-func (c Caller) String() string {
+func (c caller) String() string {
 	return fmt.Sprintf("%s(%d)", path.Base(c.file), c.line)
 }
 
-//with Function: "github.com/go-msvc/ms_test.TestCaller"
-//return "github.com/go-msvc/ms_test"
-func (c Caller) Package() string {
+// with Function: "github.com/go-msvc/ms_test.TestCaller"
+// return "github.com/go-msvc/ms_test"
+func (c caller) Package() string {
 	if i := strings.LastIndex(c.pkgDotFunc, "."); i >= 0 {
 		return c.pkgDotFunc[:i]
 	}
 	return ""
 }
 
-//with Function: "github.com/go-msvc/ms_test.TestCaller"
-//return "github.com/go-msvc/ms_test"
-func (c Caller) Function() string {
+// return "github.com/go-msvc/ms_test/my_test.go"
+func (c caller) PackageFile() string {
+	if i := strings.LastIndex(c.pkgDotFunc, "."); i >= 0 {
+		return c.pkgDotFunc[:i] + "/" + path.Base(c.file)
+	}
+	return ""
+}
+
+// with Function: "github.com/go-msvc/ms_test.TestCaller"
+// return "github.com/go-msvc/ms_test"
+func (c caller) Function() string {
 	if i := strings.LastIndex(c.pkgDotFunc, "."); i >= 0 {
 		return c.pkgDotFunc[i+1:]
 	}
 	return ""
 }
 
-func (c Caller) File() string {
+// return full file name on system where code is built...
+func (c caller) File() string {
 	return c.file
 }
 
-func (c Caller) Line() int {
+func (c caller) Line() int {
 	return c.line
 }
 
-func (caller Caller) Format(f fmt.State, c rune) {
+func (caller caller) Format(f fmt.State, c rune) {
 	var s string
 	switch c {
 	case 's', 'v':
@@ -119,10 +128,10 @@ func (caller Caller) Format(f fmt.State, c rune) {
 	io.WriteString(f, s)
 } // caller.Format()
 
-//funcName removes the path prefix component of a function's name reported by func.Name().
-// func funcName(name string) string {
-// 	i := strings.LastIndex(name, "/")
-// 	name = name[i+1:]
-// 	i = strings.Index(name, ".")
-// 	return name[i+1:]
-// } // funcName()
+// funcName removes the path prefix component of a function's name reported by func.Name().
+func funcName(name string) string {
+	i := strings.LastIndex(name, "/")
+	name = name[i+1:]
+	i = strings.Index(name, ".")
+	return name[i+1:]
+} // funcName()

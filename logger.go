@@ -2,262 +2,130 @@ package logger
 
 import (
 	"fmt"
-	"os"
-	"path"
 	"strings"
-	"sync"
 	"time"
 )
 
-type LogLevel int
+// Logger does logging
+// it can only be created from a INamedLogger which gives the structure to control log levels by name during run-time
+//
+//	but that actually only control the writer's level, which is used by all loggers with the same name
+//
+// after creating a logger, the logger level can be changed in code, e.g. by a trigger condition
+//
+//	but Logger level cannot change from outside. By default, Logger uses the level of the named logger from where
+//	it was created
+type Logger interface {
+	New(name string) Logger
 
-const (
-	LogLevelDebug = iota
-	LogLevelInfo
-	LogLevelError
-)
+	//SetXxx affects the named logger and all sub named loggers
+	//but does not change loggers already created in those names, just the names when they are used to create new loggers
+	SetWriter(newWriter IWriter) //sets the writer on this and all child loggers
+	SetLevel(newLevel Level)     //sets the level on named logger, for this logger and all NEW child loggers and existing child loggers that did not use WithLevel()
 
-type ILogger interface {
-	NewLogger(name string) ILogger //name must be valid pathname
-	Parent() ILogger
-	Children() map[string]ILogger
+	//WithXxx creates a copy of the logger with the new settings...
+	WithLevel(Level) Logger //only affects this new logger (can use LevelDefault to reset to named level and allow external control)
+	With(name string, value interface{}) Logger
 
-	Path() string //path is [/<parent path>/<name>]
-	Debugf(format string, args ...interface{})
-	Infof(format string, args ...interface{})
+	Name() string
+	Names() []string
+	Level() Level
+
+	Log(level Level, msg string)
+	Error(msg string)
+	Info(msg string)
+	Debug(msg string)
+
+	Logf(level Level, format string, args ...interface{})
 	Errorf(format string, args ...interface{})
-
-	WithStream(ILogStream) ILogger
+	Infof(format string, args ...interface{})
+	Debugf(format string, args ...interface{})
 }
-
-func Top() ILogger {
-	return top
-}
-
-func ForThisPackage() ILogger {
-	c := GetCaller(1)
-	return top.NewLogger(c.Package())
-}
-
-//Terminal is a stream for logging to stderr
-func Terminal(level LogLevel) ILogStream {
-	return logStream{
-		level:   level,
-		encoder: logEncoderTerminal{},
-		writer:  logWriterFile{file: os.Stderr},
-	}
-}
-
-// func NewTerminalLogger(name string) ILogger {
-// 	return &logger{
-// 		parent: nil,
-// 		name:   name,
-// 		path:   "/" + name,
-// 		streams: []ILogStream{
-// 			logStream{
-// 				level:   LogLevelDebug,
-// 				encoder: logEncoderTerminal{},
-// 				writer:  logWriterFile{file: os.Stderr},
-// 			},
-// 		},
-// 	}
-// }
 
 type logger struct {
-	sync.Mutex
-	parent   ILogger
-	children map[string]ILogger
-	name     string
-	path     string
-	streams  []ILogStream
+	named *named
+	level Level
+	data  map[string]interface{}
 }
 
-func (l *logger) NewLogger(name string) ILogger {
-	l.Lock()
-	defer l.Unlock()
-
-	names := strings.SplitN(path.Clean(name), "/", 2)
-	for len(names) > 1 && len(names[0]) == 0 {
-		names = strings.SplitN(names[1], "/", 2) //skip empty name
-	}
-	if len(names) == 0 || len(names[0]) == 0 {
-		return l
-	}
-
-	//get/create child
-	child, ok := l.children[names[0]]
-	if !ok {
-		path := names[0]
-		if l.path != "" {
-			path = l.path + "/" + names[0]
-		}
-
-		child = &logger{
-			parent:   l,
-			children: map[string]ILogger{},
-			name:     names[0],
-			path:     path,
-			streams:  nil, //[]ILogStream{},
-		}
-		l.children[names[0]] = child
-		fmt.Printf("created logger(%s)\n", child.Path())
-	}
-
-	if len(names) > 1 {
-		return child.NewLogger(names[1])
-	}
-	return child
+func (l logger) New(name string) Logger {
+	return l.named.New(name)
 }
 
-func (l *logger) Name() string                 { return l.name }
-func (l *logger) Parent() ILogger              { return l.parent }
-func (l *logger) Children() map[string]ILogger { return l.children }
-func (l *logger) Path() string                 { return l.path }
+func (l logger) SetWriter(newWriter IWriter) {
+	l.named.setWriter(newWriter)
+}
 
-func (l *logger) WithStream(s ILogStream) ILogger {
-	if l != nil {
-		if s != nil {
-			if l.streams == nil {
-				l.streams = []ILogStream{s}
-			} else {
-				l.streams = append(l.streams, s)
-			}
-		}
+func (l logger) SetLevel(newLevel Level) {
+	l.level = LevelDefault //clear own setting and use named's level...
+	l.named.setLevel(newLevel)
+}
+
+func (l logger) Name() string    { return l.named.name }
+func (l logger) Names() []string { return l.named.names }
+
+func (l logger) Level() Level {
+	if l.level < LevelDefault {
+		return l.level //fall through to use named logger's level
 	}
+	return l.named.level
+}
+
+func (l logger) String() string { return l.named.name }
+
+func (l logger) WithLevel(newLevel Level) Logger {
+	l.level = newLevel
 	return l
 }
 
-func (l *logger) log(caller Caller, level LogLevel, msg string) {
-	//send to all streams
-	//if no streams in this logger, use parent streams
-	if l.streams == nil && l.parent != nil {
-		if p, ok := l.parent.(*logger); ok {
-			p.log(caller, level, msg)
-		}
-	} else {
-		for _, s := range l.streams {
-			s.Log(LogRecord{
-				Caller:    caller,
+func (l logger) With(name string, value interface{}) Logger {
+	d := l.data
+	l.data = map[string]interface{}{}
+	for n, v := range d {
+		l.data[n] = v
+	}
+	l.data[name] = value
+	return l
+}
+
+func (l logger) Log(level Level, msg string) { l.log(3, level, msg) }
+func (l logger) Error(msg string)            { l.log(3, LevelError, msg) }
+func (l logger) Info(msg string)             { l.log(3, LevelInfo, msg) }
+func (l logger) Debug(msg string)            { l.log(3, LevelDebug, msg) }
+
+func (l logger) Logf(level Level, format string, args ...interface{}) {
+	l.logf(4, level, format, args...)
+}
+
+func (l logger) Errorf(format string, args ...interface{}) {
+	l.logf(4, LevelError, format, args...)
+}
+
+func (l logger) Infof(format string, args ...interface{}) {
+	l.logf(4, LevelInfo, format, args...)
+}
+
+func (l logger) Debugf(format string, args ...interface{}) {
+	l.logf(4, LevelDebug, format, args...)
+}
+
+func (l logger) log(depth int, level Level, msg string) {
+	if level <= l.Level() {
+		l.named.writer.Write(
+			Record{
+				Caller:    GetCaller(depth),
 				Timestamp: time.Now(),
 				Logger:    l,
 				Level:     level,
-				Message:   msg,
-			})
-		}
+				Message:   strings.ReplaceAll(msg, "\n", "; "),
+				Data:      l.data,
+			},
+		)
 	}
 }
 
-func (l *logger) Log(level LogLevel, msg string) {
-	l.log(GetCaller(1), level, msg)
-}
-
-func (l *logger) Logf(level LogLevel, format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	l.log(GetCaller(2), level, msg)
-}
-
-func (l *logger) Debugf(format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	l.log(GetCaller(2), LogLevelDebug, msg)
-}
-
-func (l *logger) Infof(format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	l.log(GetCaller(2), LogLevelInfo, msg)
-}
-
-func (l *logger) Errorf(format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	l.log(GetCaller(2), LogLevelError, msg)
-}
-
-// func (l *logger) debugOn() {
-// 	//let all streams write to debug
-
-// }
-
-type ILogStream interface {
-	WithWriter(ILogWriter) ILogStream
-	WithEncoder(ILogEncoder) ILogStream
-	Log(record LogRecord)
-}
-
-func NewLogStream() ILogStream {
-	return logStream{}
-}
-
-type logStream struct {
-	level   LogLevel
-	encoder ILogEncoder
-	writer  ILogWriter
-}
-
-func (s logStream) WithWriter(w ILogWriter) ILogStream {
-	s.writer = w
-	return s
-}
-
-func (s logStream) WithEncoder(e ILogEncoder) ILogStream {
-	s.encoder = e
-	return s
-}
-
-func (s logStream) Log(record LogRecord) {
-	if s.encoder != nil && s.writer != nil && record.Level >= s.level {
-		s.writer.Write(s.encoder.Encode(record))
-	}
-}
-
-type LogRecord struct {
-	Timestamp time.Time
-	Logger    ILogger
-	Caller    Caller
-	Level     LogLevel
-	Message   string
-	Data      map[string]interface{}
-}
-
-type ILogEncoder interface {
-	Encode(r LogRecord) []byte
-}
-
-type logEncoderTerminal struct{}
-
-func (e logEncoderTerminal) Encode(r LogRecord) []byte {
-	return []byte(fmt.Sprintf("%s %5.5s %25.5s: %s",
-		r.Timestamp.Format("2006-01-02 15:04:05.000"),
-		"DEBUG",
-		r.Caller,
-		r.Message,
-	))
-}
-
-type ILogWriter interface {
-	Write([]byte)
-}
-
-type logWriterFile struct {
-	file *os.File
-}
-
-func (w logWriterFile) Write(record []byte) {
-	//replace any newlines with ';' then append a newline only at the end
-	w.file.Write([]byte(strings.ReplaceAll(string(record), "\n", ";") + "\n"))
-}
-
-var (
-	top *logger
-)
-
-func init() {
-	//top by default has no streams and logs nothing
-	//DebugOn() can be used to let every logger write to the terminal
-	//DebugPackage(<name>) can be used to let a package write to the terminal
-	top = &logger{
-		parent:   nil,
-		children: map[string]ILogger{},
-		name:     "",
-		path:     "",
-		streams:  nil, //[]ILogStream{},
+func (l logger) logf(depth int, level Level, format string, args ...interface{}) {
+	if level <= l.Level() {
+		l.log(depth, level, fmt.Sprintf(format, args...))
 	}
 }
