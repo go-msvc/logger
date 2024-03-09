@@ -56,7 +56,7 @@ func (l logger) SetWriter(newWriter IWriter) {
 	l.named.setWriter(newWriter)
 }
 
-func (l logger) SetLevel(newLevel Level) {
+func (l *logger) SetLevel(newLevel Level) {
 	l.level = LevelDefault //clear own setting and use named's level...
 	l.named.setLevel(newLevel)
 }
@@ -73,12 +73,12 @@ func (l logger) Level() Level {
 
 func (l logger) String() string { return l.named.name }
 
-func (l logger) WithLevel(newLevel Level) Logger {
+func (l *logger) WithLevel(newLevel Level) Logger {
 	l.level = newLevel
 	return l
 }
 
-func (l logger) With(name string, value interface{}) Logger {
+func (l *logger) With(name string, value interface{}) Logger {
 	d := l.data
 	l.data = map[string]interface{}{}
 	for n, v := range d {
@@ -109,7 +109,7 @@ func (l logger) Debugf(format string, args ...interface{}) {
 	l.logf(4, LevelDebug, format, args...)
 }
 
-func (l logger) log(depth int, level Level, msg string) {
+func (l *logger) log(depth int, level Level, msg string) {
 	if level <= l.Level() {
 		l.named.writer.Write(
 			Record{

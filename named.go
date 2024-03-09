@@ -37,7 +37,7 @@ func (l *named) New(name string) Logger {
 		l.subs[name] = nl
 	}
 
-	return logger{
+	return &logger{
 		named: nl,
 		data:  map[string]interface{}{},
 		level: LevelDefault,
@@ -72,7 +72,7 @@ func (l *named) Names() []string { return l.names }
 func (l *named) Level() Level { return l.level }
 
 func (l *named) WithLevel(newLevel Level) Logger {
-	return logger{
+	return &logger{
 		named: l,
 		level: LevelDefault,
 		data:  map[string]interface{}{},
@@ -80,7 +80,7 @@ func (l *named) WithLevel(newLevel Level) Logger {
 }
 
 func (l *named) With(name string, value interface{}) Logger {
-	return logger{
+	return &logger{
 		named: l,
 		level: LevelDefault,
 		data:  map[string]interface{}{name: value},

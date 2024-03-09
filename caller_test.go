@@ -43,8 +43,7 @@ func TestCaller(t *testing.T) {
 		{"%10.5F", fmt.Sprintf("ler(%5d)", lineNr)},
 	}
 	for index, test := range tests {
-		var s string
-		s = fmt.Sprintf(test.format, c)
+		s := fmt.Sprintf(test.format, c)
 		if s != test.expectedValue {
 			t.Fatalf("test[%d] fmt.Sprintf(\"%s\", caller) -> \"%s\" != \"%s\"", index, test.format, s, test.expectedValue)
 		}

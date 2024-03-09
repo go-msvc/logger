@@ -6,7 +6,7 @@ import (
 	"github.com/go-msvc/logger"
 )
 
-func test(t *testing.T, w *testWriter, l logger.Logger) {
+func test(_ *testing.T, _ *testWriter, l logger.Logger) {
 	l.Debugf("123") //line 10
 	l.Infof("123")  //line 11
 	l.Errorf("123") //line 12
